@@ -44,7 +44,26 @@ public class Program
 		 */
 		if (message.Content.StartsWith("::"))
 		{
-			await message.Channel.SendMessageAsync("Hey, " + message.Author.Username + " the Command ''" + message.Content + "'' wasn't found use ::help for more information.");
+			char[] chararray = message.Content.ToCharArray();
+			int index = -1;
+			while (++index < chararray.Length)
+			{
+				if (chararray[index] != ':')
+					break;
+			}
+			for (int i = index; i < chararray.Length; ++i)
+				chararray[i] |= (char)0x20;
+
+			string output = new string(chararray, index, chararray.Length - index);
+			if (false)
+			{
+
+			}
+			else
+			{
+				output = "Hey, " + message.Author.Username + " the Command ''" + output + "'' wasn't found use ::help for more information.";
+			}
+			await message.Channel.SendMessageAsync(output);
 		}
 	}
 
