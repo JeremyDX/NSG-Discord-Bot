@@ -10,12 +10,16 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Web;
 using System.Net;
+using System.Collections;
 
 public class Program
 {
 	private DiscordSocketClient _client;
 
 	private static Int64 last_time_stamp = 15271402510L;
+
+	private Hashtable saved_timers = new Hashtable();
+
 
 	private static readonly string[] MONTHS =
 	{
@@ -24,7 +28,7 @@ public class Program
 
 	private static readonly string[] TAMES =
 	{
-
+		"giga"
 	};
 
 	private static readonly int[] PLAYER_TOTAL_XP =
@@ -92,7 +96,7 @@ public class Program
 		client.Channel.SendMessageAsync(message);
 	}
 
-	private int SecureParseInt32(ref String number)
+	private static int SecureParseInt32(ref String number)
 	{
 		int value = -1;
 
@@ -107,14 +111,65 @@ public class Program
 		return value;
 	}
 
-	private async Task MessageRecieved(SocketMessage message)
+	private static long SecureParseInt64(ref String number)
+	{
+		long value = -1;
+
+		try
+		{
+			value = Int64.Parse(number);
+		}
+		catch (Exception)
+		{
+
+		}
+		return value;
+	}
+
+	private static double SecureParseDouble(ref String number)
+	{
+		double value = -1;
+
+		try
+		{
+			value = Double.Parse(number);
+		}
+		catch (Exception)
+		{
+
+		}
+		return value;
+	}
+
+	private static String ConvertSecondsToTime(long time)
+	{
+		StringBuilder sb = new StringBuilder(8);
+		long hours = time / 3600;
+		long minutes = (time - (hours * 3600)) / 60;
+		long seconds = (int)(time - (hours * 3600) - (minutes * 60));
+
+		if (hours < 10)
+			sb.Append('0');
+		sb.Append(hours);
+		sb.Append(':');
+		if (minutes < 10)
+			sb.Append('0');
+		sb.Append(minutes);
+		sb.Append(':');
+		if (seconds < 10)
+			sb.Append('0');
+		sb.Append(seconds);
+		return sb.ToString();
+	}
+
+	private async Task MessageRecieved(SocketMessage connection)
 	{
 		/*
 		 * Command Initiated..
 		 */
-		if (message.Content.StartsWith("::"))
+		if (connection.Content.StartsWith("::"))
 		{
-			char[] chararray = message.Content.ToCharArray();
+			char[] chararray = connection.Content.ToCharArray();
 			int index = -1;
 			while (++index < chararray.Length)
 			{
@@ -125,30 +180,78 @@ public class Program
 				chararray[i] |= (char)0x20;
 
 			string output = new string(chararray, index, chararray.Length - index);
-
+			string message = "";
+	
 			string[] commands = output.Split(' ');
 
-			if (output.Equals("help"))
+
+			Console.Write("Command: " + commands[0] + " Output: " + output + " , Length: " + commands.Length);
+
+			if (commands[0].Contains("help"))
 			{
-				output = "Hey, " + message.Author.Username + " below are the following commands.";
-				output += "\n" + "::breedcryo - This will give a list of time in minutes of how long tames are knocked out when cryo sicked.";
+				message = "Hey, " + connection.Author.Username + " visit the **Announcements** section for a list of commands!";
 			}
-			else if (output.Equals("breed"))
+			else if (commands[0].Equals("breed"))
 			{
-				output = "Gigas: 1 Minute , 16 Seconds";
+				int breed_id = -1;
+				if (commands.Length > 1)
+				{
+					if (commands[1].Equals("giga") || commands[1].Equals("gig"))
+						breed_id = 0;
+					if (commands[1].Length == 21 && commands[1][0] == '<' && commands[1][20] == '>')
+					{
+						breed_id = -1;
+						String number = (commands[1].Substring(2, 18));
+						long id = SecureParseInt64(ref number);
+						message += "Author Lookup Test" + commands[1] + " vs " + id + "\n";
+					}
+					if (commands[1].Length == 22 && commands[1][0] == '<' && commands[1][21] == '>')
+					{
+						breed_id = -1;
+						String number = (commands[1].Substring(3, 18));
+						long id = SecureParseInt64(ref number);
+						message += "Author Lookup Test" + commands[1] + " vs " + id + "\n";
+					}
+				}
+				if (commands.Length > 2)
+				{
+					if (breed_id != -1)
+					{
+						//12 = 1:12:00 Hours.
+						double weight = SecureParseDouble(ref commands[2]);
+						if (weight >= 0)
+						{
+							String time = ConvertSecondsToTime((int)(weight * 135));
+							message += "With " + weight + "kg weight of raw meat your " + TAMES[breed_id] + " " + time + " hours unattended before refill is required.\n";
+						}
+					}
+				}
+				if (output.Contains("starve"))
+				{
+					int stack_size = 1;
+					if (commands.Length > 2)
+					{
+						stack_size = SecureParseInt32(ref commands[1]);
+					}
+					message += "Manas: 15 Minutes per Full Stack.\n";
+					message += "Gigas: 6 Minutes per Full Stack.\n";
+				}
+				if (output.Contains("cyro") || output.Contains("sick"))
+				{
+					message = "Gigas: 1 Minute , 16 Seconds\n";
+				}
 			}
 			else if (commands[0].Equals("gif"))
 			{
-				output = null;
-				await message.Channel.SendFileAsync("resources/gif.gif");
+				message = "";
+				await connection.Channel.SendFileAsync("resources/gif.gif");
 			}
 			else if (commands[0].StartsWith("exp") || commands[0].StartsWith("xp"))
 			{
 				if (commands.Length == 1)
 				{
-					output = "Hey, " + message.Author.Username + " to use this command please do the below.\n";
-					output += "This a ranged based experience command.\n";
-					output += "I.e. ::xp 100 106 will give you how much experience you need to reach 106 from 100.\n";
+					message = "Hey, " + connection.Author.Username + " to use this command please do the below.\n";
+					message += "I.e. ::xp 100 106 will give you how much experience you need to reach 106 from 100.\n";
 				}
 				else if (commands.Length == 2)
 				{
@@ -159,36 +262,67 @@ public class Program
 					}
 					else
 					{
-						output = "The amount of experience to reach level **" + level + "** is **" + PLAYER_TOTAL_XP[level].ToString("N0") + "** experience.";
+						String s = ConvertSecondsToTime(PLAYER_TOTAL_XP[level] / 5);
+						int stone = 1 + (PLAYER_TOTAL_XP[level] / 3);
+
+						message = "The amount of experience to reach level **" + level + "** is **" + PLAYER_TOTAL_XP[level].ToString("N0") + "** experience.\n";
+						message += "You'll have to sleep in a Tek Pod for roughly: **" + s + "** amount of time!\n";
+						message += "This would also require **" + stone.ToString("N0") + "** worth of stone grinded.\n";
 					}
 				}
 				else if (commands.Length == 3)
 				{
 					int level_start = SecureParseInt32(ref commands[1]);
 					int level_end = SecureParseInt32(ref commands[2]);
+
 					if ((level_start >= level_end) || (level_start <= 0) || (level_end >= PLAYER_TOTAL_XP.Length))
 					{
-						output = "[Invalid Format Provided]: Try ::exp 100 135 as an example to find exp needed from 100 to 135.\n";
-						output += (level_start >= level_end) + " , " + (level_start <= 0) + " , " + (level_end > PLAYER_TOTAL_XP.Length) +
+						message = "[Invalid Format Provided]: Try ::exp 100 135 as an example to find exp needed from 100 to 135.\n";
+						message += (level_start >= level_end) + " , " + (level_start <= 0) + " , " + (level_end > PLAYER_TOTAL_XP.Length) +
 							" , " + level_end + " , " + PLAYER_TOTAL_XP.Length;
 					}
 					else
 					{
-						output = "The amount of experience to reach level **" + level_end + "** from **" + level_start + "** is **" + (PLAYER_TOTAL_XP[level_end] -  PLAYER_TOTAL_XP[level_start]).ToString("N0") + "** experience.";
+						String s = ConvertSecondsToTime((PLAYER_TOTAL_XP[level_end] - PLAYER_TOTAL_XP[level_start]) / 5);
+						int stone = 1 + ((PLAYER_TOTAL_XP[level_end] - PLAYER_TOTAL_XP[level_start]) / 3);
+
+						message = "The amount of experience to reach level **" + level_end + "** from **" + level_start + "** is **" + (PLAYER_TOTAL_XP[level_end] - PLAYER_TOTAL_XP[level_start]).ToString("N0") + "** experience.\n";
+						message += "You'll have to sleep in a Tek Pod for roughly: **" + s + "** amount of time!\n";
+						message += "This would also require **" + stone.ToString("N0") + "** worth of stone grinded.\n";
 					}
 				}
 			}
-			else if (output.StartsWith("kib"))
+			else if (commands[0].StartsWith("kib"))
 			{
 				if (output.Contains("colors"))
 				{
-					await message.Channel.SendFileAsync("resources/kibbletypes.png");
+					await connection.Channel.SendFileAsync("resources/kibbletypes.png");
 				}
-			}
-			else if (commands[0].Equals("starve"))
-			{
 
+				if (commands.Length >= 2)
+				{
+					bool taming = output.Contains("tame");
 
+					if (output.Contains("basic"))
+					{
+						message += "**Basic Kibble (White)**\n";
+						message += "*Eggs*: Dilo, Dodo, Featherlight, Kairuku, Lystro, Parasaur, Vulture\n";
+						message += "*Extras*: 1 Cooked Meat, 10 Amarberry, 10 Tintoberry, 5 Fiber\n";
+
+						if (taming)
+							message += "*Tames*: Dilo, Dodo, Featherlight, Glowtail, Kairuku, Lystro, Monkey, Parsaur, Phiomia\n";
+					}
+
+					if (output.Contains("simple"))
+					{
+						message += "**Basic Kibble (White)**\n";
+						message += "   **Eggs**: Archpteryx, Compy, Dimorph, Gally, Glowtail, Moth, Micro, Morella, Oviraptor, Pachy, Pego, Ptera, Raptor, Trike\n";
+						message += "   **Extras**: 1 Cooked Fish Meat, 2 Carrots, 2 Mejoberry, 5 Fiber.\n";
+
+						if (taming)
+							message += "   **Tames**: Archpteryx, Diplocaulus, Gally, Giant Bee, Itchy, Iguanodon, Deer, Morellatrops, Pachy, Pego, Trike, Raptor\n";
+					}
+				}
 			}
 			else if (output.Equals("tw"))
 			{
@@ -253,11 +387,11 @@ public class Program
 			}
 			else
 			{
-				output = "Hey, " + message.Author.Username + " the Command ''" + output + "'' wasn't found use ::help for more information.";
+				output = "Hey, " + connection.Author.Username + " the Command ''" + output + "'' wasn't found use ::help for more information.";
 			}
 
-			if (output != null)
-				await message.Channel.SendMessageAsync(output);
+			if (message != null && message.Length > 0)
+				await connection.Channel.SendMessageAsync(message);
 
 			//output = "ChannelID: " + message.Channel.Id;
 			//await message.Channel.SendMessageAsync(output);
